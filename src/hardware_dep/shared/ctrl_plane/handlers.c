@@ -30,6 +30,16 @@ int handle_p4_msg(char* buffer, int length, p4_msg_callback cb)
 			if (rval<0) return rval;
 			cb(&ctrl_m);
 			break;
+		case P4T_MODIFY_TABLE_ENTRY:
+			rval = handle_p4_change_table_entry(netconv_p4_change_table_entry((struct p4_change_table_entry*)buffer), &ctrl_m);
+#ifdef T4P4S_DEBUG
+			if (rval != 0) {
+				printf("[CTRL]    :: CHANGE_TABLE_ENTRY rval=%d\n", rval);
+			}
+#endif
+			if (rval<0) return rval;
+			cb(&ctrl_m);
+			break;
 		case P4T_ADD_TABLE_ENTRY:
 			rval = handle_p4_add_table_entry(netconv_p4_add_table_entry((struct p4_add_table_entry*)buffer), &ctrl_m);
 #ifdef T4P4S_DEBUG
@@ -92,6 +102,54 @@ int handle_p4_set_default_action(struct p4_set_default_action* m, struct p4_ctrl
 	return 0;
 }
 
+int handle_p4_change_table_entry(struct p4_change_table_entry* m, struct p4_ctrl_msg* ctrl_m)
+{
+        int i;
+        int num_params;
+	int size;
+        uint16_t offset = 0;
+        char* buffer = 0;
+	struct p4_action* action;
+
+        ctrl_m->type = m->header.type;
+        ctrl_m->xid = m->header.xid;
+        ctrl_m->table_name = m->table_name;
+	num_params = m->read_size;
+	
+	if (num_params>P4_MAX_NUMBER_OF_FIELD_MATCHES)
+		return -1; /*Too much field matching rules*/
+
+	ctrl_m->num_field_matches = num_params;
+
+	buffer = (char*)(m) + sizeof(struct p4_add_table_entry);
+	offset = 0;
+
+	for (i=0;i<num_params;++i)
+	{
+		ctrl_m->field_matches[i] = netconv_p4_field_match_complex(unpack_p4_field_match_header(buffer, offset),&size);
+		offset += size; /*sizeof(struct p4_field_match_header);*/
+	}
+
+	action = unpack_p4_action(buffer, offset);
+
+        ctrl_m->action_type = action->description.type;
+        ctrl_m->action_name = action->description.name;
+        num_params = action->param_size;
+        offset += sizeof(struct p4_action);
+
+        if (num_params>P4_MAX_NUMBER_OF_ACTION_PARAMETERS)
+                return -2;      /*Too much arguments*/
+
+	ctrl_m->num_action_params = num_params;
+
+        for (i=0;i<num_params;++i)
+        {
+                ctrl_m->action_params[i] = netconv_p4_action_parameter(unpack_p4_action_parameter(buffer, offset));
+                offset += sizeof(struct p4_action_parameter);
+        }
+
+        return 0;
+}
 int handle_p4_add_table_entry(struct p4_add_table_entry* m, struct p4_ctrl_msg* ctrl_m)
 {
         int i;

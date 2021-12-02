@@ -12,6 +12,8 @@
 for table in hlir.tables:
     #{ typedef struct table_entry_${table.name}_s {
     #[     struct ${table.name}_action  action;
+    if (table.used_writable and table.synced):
+        #[     lock_t                   lock;
     #[     entry_validity_t         is_entry_valid;
     #} } table_entry_${table.name}_t;
 

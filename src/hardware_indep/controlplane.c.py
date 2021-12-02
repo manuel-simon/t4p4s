@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2016 Eotvos Lorand University, Budapest, Hungary
 
+from utils.codegen import is_primitive
+
 #[ #include <unistd.h>
 
 #[ #include "dpdk_lib.h"
@@ -48,15 +50,17 @@ for table in hlir.tables:
         #[ uint8_t field_${k.header.name}_${k.field_name}[$byte_width],
 
         # TODO have keys' and tables' matchType the same case (currently: LPM vs lpm)
-        if k.matchType == "ternary":
-            #[ uint8_t ${k.field_name}_mask[$byte_width],
-        if k.matchType == "lpm":
+        if k.matchType.path.name  == "ternary":
+            #[ uint8_t field_${k.field_name}_mask[$byte_width],
+        if k.matchType.path.name  == "lpm":
             #[ uint8_t field_${k.header.name}_${k.field_name}_prefix_length,
 
     #}     struct ${table.name}_action action, bool has_fields)
     #{ {
 
     #[     uint8_t key[${table.key_length_bytes}];
+    if table.matchType.name == "TERNARY":
+        #[     uint8_t mymask[${table.key_length_bytes}];
 
     byte_idx = 0
     for k in sorted((k for k in table.key.keyElements), key = lambda k: k.match_order):
@@ -66,26 +70,30 @@ for table in hlir.tables:
 
         byte_width = get_key_byte_width(k)
         #[ memcpy(key+$byte_idx, field_${k.header.name}_${k.field_name}, $byte_width);
+        if k.matchType.path.name  == "ternary":
+            #[ memcpy(mymask+$byte_idx, field_${k.header.name}_${k.field_name}_mask, $byte_width);
         byte_idx += byte_width
 
-    if table.matchType.name == "lpm":
+    if table.matchType.name  == "lpm":
         #[ uint8_t prefix_length = 0;
         for k in table.key.keyElements:
             # TODO should properly handle specials (isValid etc.)
             if 'header' not in k:
                 continue
 
-            if k.matchType == "exact":
+            if k.matchType.path.name  == "exact":
                 #[ prefix_length += ${get_key_byte_width(k)};
-            if k.matchType == "lpm":
+            if k.matchType.path.name  == "lpm":
                 #[ prefix_length += field_${k.header.name}_${k.field_name}_prefix_length;
         #[ int c, d;
         #[ for(c = ${byte_idx-1}, d = 0; c >= 0; c--, d++) *(reverse_buffer+d) = *(key+c);
         #[ for(c = 0; c < ${byte_idx}; c++) *(key+c) = *(reverse_buffer+c);
         #[ lpm_add_promote(TABLE_${table.name}, (uint8_t*)key, prefix_length, (uint8_t*)&action, has_fields);
 
-    if table.matchType.name == "exact":
+    if table.matchType.name  == "exact" or table.matchType.name  == "exact_inplace":
         #[ exact_add_promote(TABLE_${table.name}, (uint8_t*)key, (uint8_t*)&action, has_fields);
+    if table.matchType.name  == "ternary":
+        #[ ternary_add_promote(TABLE_${table.name}, (uint8_t*)key, (uint8_t*)mymask, (uint8_t*)&action);
 
     #} }
 
@@ -103,8 +111,8 @@ for table in hlir.tables:
             #[ uint16_t field_${k.header.name}_${k.field_name}_prefix_length = ((struct p4_field_match_lpm*)ctrl_m->field_matches[${i}])->prefix_length;
         if k.matchType.path.name == "ternary":
             # TODO are these right?
-            #[ uint8_t* field_${k.header.name}_${k.field_name} = (uint8_t*)(((struct p4_field_match_lpm*)ctrl_m->field_matches[${i}])->bitmap);
-            #[ uint16_t field_${k.header.name}_${k.field_name}_prefix_length = ((struct p4_field_match_lpm*)ctrl_m->field_matches[${i}])->prefix_length;
+            #[ uint8_t* field_${k.header.name}_${k.field_name} = (uint8_t*)(((struct p4_field_match_ternary*)ctrl_m->field_matches[${i}])->bitmap);
+            #[ uint8_t* field_${k.header.name}_${k.field_name}_mask = (uint8_t*)(((struct p4_field_match_ternary*)ctrl_m->field_matches[${i}])->mask);
 
     for action in table.actions:
         #{ if(strcmp("${action.action_object.name}", ctrl_m->action_name)==0) {
@@ -112,18 +120,17 @@ for table in hlir.tables:
         #[     action.action_id = action_${action.action_object.name};
         for j, p in enumerate(action.action_object.parameters.parameters):
             #[ uint8_t* bitmap_${p.name} = (uint8_t*)((struct p4_action_parameter*)ctrl_m->action_params[$j])->bitmap;
-            #[ memcpy(action.${action.action_object.name}_params.${p.name}, bitmap_${p.name}, ${(p.urtype.size+7)//8});
-
+            #[ memcpy(${'&' if is_primitive(p.type) else ''}action.${action.action_object.name}_params.${p.name}, bitmap_${p.name}, ${(p.urtype.size+7)//8});
         params = []
         for i, k in enumerate(table.key.keyElements):
             if 'header' not in k:
                 continue
 
             params.append(f'field_{k.header.name}_{k.field_name}')
-            if k.matchType == "lpm":
+            if k.matchType.path.name  == "lpm":
                 params.append(f"field_{k.header.name}_{k.field_name}_prefix_length")
-            if k.matchType == "ternary":
-                params.append("0 /* TODO ternary dstPort_mask */")
+            if k.matchType.path.name  == "ternary":
+                params.append(f"field_instance_{k.header.name}_{k.field_name}_mask + /* TODO ternary dstPort_mask */")
 
         has_fields = "false" if len(action.action_object.parameters.parameters) == 0 else "true"
         joined_params = ', '.join(params + ["action", has_fields])
@@ -148,7 +155,7 @@ for table in hlir.tables:
 
         for j, p in enumerate(action.action_object.parameters.parameters):
             #[ uint8_t* ${p.name} = (uint8_t*)((struct p4_action_parameter*)ctrl_m->action_params[$j])->bitmap;
-            #[ memcpy(action.${action.action_object.name}_params.${p.name}, ${p.name}, ${(p.urtype.size+7)//8});
+            #[ memcpy(${'&' if is_primitive(p.type) else ''}action.${action.action_object.name}_params.${p.name}, ${p.name}, ${(p.urtype.size+7)//8});
 
         #{     if (${"false" if table.is_hidden else "true"}) {
         #[         debug(" " T4LIT(ctl>,incoming) " " T4LIT(Set default action,action) " for $$[table]{table.name}: $$[action]{action.action_object.name}\n");
@@ -236,6 +243,9 @@ for table in hlir.tables:
 #} }
 
 
+
+#[ extern int master_socket_id;
+
 #[ ctrl_plane_backend bg;
 #[ void init_control_plane()
 #[ {
@@ -245,8 +255,8 @@ for table in hlir.tables:
 #[     #ifdef T4P4S_DEBUG
 #[     for (int i = 0; i < NB_TABLES; i++) {
 #[         lookup_table_t t = table_config[i];
-#[         if (state[0].tables[t.id][0]->init_entry_count > 0)
-#[             debug("    " T4LIT(:,incoming) " Table " T4LIT(%s,table) " got " T4LIT(%d) " entries from the control plane\n", state[0].tables[t.id][0]->name, state[0].tables[t.id][0]->init_entry_count);
+#[         if (state[master_socket_id].tables[t.id][0]->init_entry_count > 0)
+#[             debug("    " T4LIT(:,incoming) " Table " T4LIT(%s,table) " got " T4LIT(%d) " entries from the control plane\n", state[master_socket_id].tables[t.id][0]->name, state[master_socket_id].tables[t.id][0]->init_entry_count);
 #[         }
 #[     #endif
 #[ }

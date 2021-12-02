@@ -28,6 +28,7 @@ void      ternary_create (lookup_table_t* t, int socketid);
 void    table_setdefault (lookup_table_t* t,                              uint8_t* value);
 
 void           exact_add (lookup_table_t* t, uint8_t* key,                uint8_t* value);
+void        exact_change (lookup_table_t* t, uint8_t* key,                uint8_t* value);
 void             lpm_add (lookup_table_t* t, uint8_t* key, uint8_t depth, uint8_t* value);
 void         ternary_add (lookup_table_t* t, uint8_t* key, uint8_t* mask, uint8_t* value);
 

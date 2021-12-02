@@ -13,7 +13,9 @@ void create_tables_on_socket(int socketid)
     for (int i = 0; i < NB_TABLES; i++) {
         lookup_table_t t = table_config[i];
 
-        for (int j = 0; j < NB_REPLICA; j++) {
+        const int replicas = t.has_replicas ? NB_REPLICA : 1;
+
+        for (int j = 0; j < replicas; j++) {
             state[socketid].tables[i][j] = malloc(sizeof(lookup_table_t));
             memcpy(state[socketid].tables[i][j], &t, sizeof(lookup_table_t));
             state[socketid].tables[i][j]->instance = j;
@@ -72,6 +74,7 @@ void init_tables()
     init_print_table_info();
 #endif
 
+    master_socket_id = get_master_socketid();
     for (unsigned lcore_id = 0; lcore_id < RTE_MAX_LCORE; lcore_id++) {
         create_tables_on_lcore(lcore_id);
     }
@@ -83,8 +86,9 @@ void flush_tables_on_socket(int socketid)
 {
     for (int i = 0; i < NB_TABLES; i++) {
         lookup_table_t t = table_config[i];
+        const int replicas = t.has_replicas ? NB_REPLICA : 1;
 
-        for (int j = 0; j < NB_REPLICA; j++) {
+        for (int j = 0; j < replicas; j++) {
             flush_table(state[socketid].tables[i][j]);
         }
 

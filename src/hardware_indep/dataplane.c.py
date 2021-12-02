@@ -15,8 +15,8 @@ from compiler_common import types
 #[ #include "tables.h"
 #[ #include "gen_include.h"
 
-#[ uint8_t* emit_addr;
-#[ uint32_t ingress_pkt_len;
+#[ //uint8_t* emit_addr;
+#[ //uint32_t ingress_pkt_len;
 
 #[ extern ctrl_plane_backend bg;
 #[ extern char* action_names[];
@@ -98,10 +98,15 @@ def unique_stable(items):
     return list(OrderedDict.fromkeys(items))
 
 
+def lockAction(action, table):
+    return action.has_write_table_parameter and table.synced
+
+
 for type in unique_stable([comp['type'] for table in hlir.tables for smem in table.direct_meters + table.direct_counters for comp in smem.components]):
     #[ void apply_direct_smem_$type(register_uint32_t* smem, uint32_t value, char* table_name, char* smem_type_name, char* smem_name) {
     #[    debug("     : applying apply_direct_smem_$type(register_uint32_t (*smem)[1], uint32_t value, char* table_name, char* smem_type_name, char* smem_name)");
     #[ }
+
 
 
 for table in hlir.tables:
@@ -126,7 +131,7 @@ for table in hlir.tables:
             #[               ${table.key_length_bytes},
             #[               ${table.key_length_bytes} == 0 ? "$$[bytes]{}{(empty key)}" : "");
 
-            #[     table_entry_${table.name}_t* entry = (table_entry_${table.name}_t*)${table.matchType.name}_lookup(tables[TABLE_${table.name}], (uint8_t*)key);
+            #[     table_entry_${table.name}_t* entry = (table_entry_${table.name}_t*)${table.matchType.name.split('_')[0]}_lookup(tables[TABLE_${table.name}], (uint8_t*)key);
             #[     bool hit = entry != NULL && entry->is_entry_valid != INVALID_TABLE_ENTRY;
             #{     if (unlikely(!hit)) {
             #[         entry = (table_entry_${table.name}_t*)tables[TABLE_${table.name}]->default_val;
@@ -171,7 +176,11 @@ for table in hlir.tables:
     for action in table.actions:
         action_name = action.action_object.name
         #{         case action_${action_name}:
-        #[           action_code_${action_name}(entry->action.${action_name}_params, SHORT_STDPARAMS_IN);
+        if lockAction(action.action_object, table):
+            #[           LOCK(&entry->lock);
+        #[           action_code_${action_name}(&(entry->action.${action_name}_params), SHORT_STDPARAMS_IN);
+        if lockAction(action.action_object, table):
+            #[           UNLOCK(&entry->lock);
         #}           break;
     #[       }
     #}     }
@@ -400,7 +409,7 @@ pkt_name_indent = " " * longest_hdr_name_len
 #[     pd->parsed_length = 0;
 #[     parse_packet(STDPARAMS_IN);
 #[
-#[     emit_addr = pd->data;
+#[     //emit_addr = pd->data;
 #[     pd->emit_hdrinst_count = 0;
 #[     pd->is_emit_reordering = false;
 #[

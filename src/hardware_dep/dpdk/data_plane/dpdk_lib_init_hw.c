@@ -171,7 +171,7 @@ bool init_tx_on_lcore(unsigned lcore_id, uint8_t portid, uint16_t queueid)
 
     uint8_t socketid = get_socketid(lcore_id);
 
-    debug("txq=%u,%d,%d\n", lcore_id, queueid, socketid);
+    debug("txq=(core)%u,(queue)%d,(socket)%d\n", lcore_id, queueid, socketid);
     fflush(stdout);
 
     struct rte_eth_dev_info dev_info;
@@ -227,7 +227,7 @@ void dpdk_init_rx_queue(uint8_t queue, unsigned lcore_id, struct lcore_conf* qco
 
     int socketid = get_socketid(lcore_id);
 
-    debug("rxq=%d,%d,%d ", portid, queueid, socketid);
+    debug("rxq=%d,%d,%d \n", portid, queueid, socketid);
     fflush(stdout);
 
     int ret = rte_eth_rx_queue_setup(portid, queueid, t4p4s_nb_rxd,

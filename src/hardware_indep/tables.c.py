@@ -20,6 +20,10 @@ from compiler_common import generate_var_name, prepend_statement
 for table in hlir.tables:
     tmt = table.matchType.name
     ks  = table.key_length_bytes
+    ts = table.table_size if hasattr(table, 'size') else 512
+    lk = "true" if table.used_writable and table.synced else "false"
+    hr = "false" if table.impl == "dpdk" else "true"
+
     #[ {
     #[  .name= "${table.name}",
     #[  .id = TABLE_${table.name},
@@ -34,26 +38,34 @@ for table in hlir.tables:
 
     #[      .key_size = $ks,
 
-    #[      .entry_size = sizeof(struct ${table.name}_action) + sizeof(entry_validity_t),
+    if table.used_writable and table.synced:
+        #[      .entry_size = RTE_ALIGN(sizeof(struct ${table.name}_action) + sizeof(entry_validity_t) + sizeof(lock_t), 16),
+        #[      .lock_size = sizeof(lock_t),
+    else:
+        #[      .entry_size = sizeof(struct ${table.name}_action) + sizeof(entry_validity_t),
+        #[      .lock_size = 0,
     #[      .action_size   = sizeof(struct ${table.name}_action),
     #[      .validity_size = sizeof(entry_validity_t),
     #[  },
 
     #[  .min_size = 0,
-    #[  .max_size = 250000,
+    #[  .max_size = $ts,
+    #[  .access_locked = $lk,
+    #[  .has_replicas = $hr,
     #[ },
 #[ };
 
 
 #[ extern struct socket_state state[NB_SOCKETS];
 #[ extern void table_setdefault_promote  (int tableid, uint8_t* value);
+#[ extern int master_socket_id;
 
 #{ void init_table_default_actions() {
 #[     debug(" :::: Init table default actions\n");
 
 for table in hlir.tables:
-    #[ int current_replica_${table.name} = state[0].active_replica[TABLE_${table.name}];
-    #{ if (state[0].tables[TABLE_${table.name}][current_replica_${table.name}]->default_val == NULL) {
+    #[ int current_replica_${table.name} = state[master_socket_id].active_replica[TABLE_${table.name}];
+    #{ if (state[master_socket_id].tables[TABLE_${table.name}][current_replica_${table.name}]->default_val == NULL) {
     #{     table_entry_${table.name}_t initial_default = {
     #[          .action = { action_${table.default_action.expression.method.action_ref.name} },
     #[          .is_entry_valid = VALID_TABLE_ENTRY,

@@ -18,7 +18,7 @@ from compiler_common import unique_everseen
 # TODO this should not be here in the indep section
 #[ #include "dpdk_smem.h"
 
-#[ #define FIELD(name, length) uint8_t name[(length + 7) / 8];
+#[ #define WIDEFIELD(name, length) uint8_t name[(length + 7) / 8];
 
 
 #{ enum actions {
@@ -33,10 +33,14 @@ for ctl in hlir.controls:
         #{ typedef struct action_${act.name}_params_s {
         for param in act.parameters.parameters:
             paramtype = param.urtype
-            #[     FIELD(${param.name}, ${paramtype.size});
-
+            if paramtype.size in {8, 16, 32}:
+                typeString = 'u' if not paramtype.isSigned else ''
+                typeString += 'int%s_t' % paramtype.size
+                #[ ${typeString} ${param.name};
+            else:
+                #[ WIDEFIELD(${param.name}, ${paramtype.size});
         if len(act.parameters.parameters) == 0:
-            #[     FIELD(DUMMY_FIELD, 0);
+            #[ WIDEFIELD(DUMMY_FIELD, 0);
         #} } action_${act.name}_params_t;
 
 for table in hlir.tables:
@@ -57,7 +61,7 @@ for table in hlir.tables:
         aname = action.action_object.name
         mname = action.expression.method.path.name
 
-        #[ void action_code_$aname(action_${mname}_params_t, SHORT_STDPARAMS);
+        #[ void action_code_$aname(action_${mname}_params_t*, SHORT_STDPARAMS);
 
 non_ctr_locals = ('counter', 'direct_counter', 'meter')
 

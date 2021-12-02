@@ -26,6 +26,8 @@ uint32_t enabled_port_mask;
 uint16_t            nb_lcore_params;
 struct lcore_params lcore_params[MAX_LCORE_PARAMS];
 
+int master_socket_id;
+
 //=============================================================================
 // Locals
 
@@ -46,6 +48,12 @@ int get_socketid(unsigned lcore_id)
     }
 
     return socketid;
+}
+
+int get_master_socketid()
+{
+    int lcore_id = rte_get_master_lcore();
+    return get_socketid(lcore_id);
 }
 
 // Returns the number of rx queues that this port has.

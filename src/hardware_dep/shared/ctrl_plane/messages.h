@@ -216,6 +216,14 @@ struct p4_add_table_entry {
 	/* struct p4_action; */
 };
 
+struct p4_change_table_entry {
+    struct p4_header header;
+    char table_name[P4_MAX_TABLE_NAME_LEN];
+    uint8_t read_size;
+    /* struct p4_field_match matches[read_size]; */
+    /* struct p4_action; */
+};
+
 #define P4_MAX_FIELD_LIST_NAME_LEN 128
 #define P4_MAX_FIELD_NAME_LENGTH 128
 #define P4_MAX_FIELD_VALUE_LENGTH 32
@@ -239,6 +247,7 @@ void check_p4_header( struct p4_header* a, struct p4_header* b);
 struct p4_header* netconv_p4_header(struct p4_header* m);
 
 struct p4_add_table_entry* create_p4_add_table_entry(char* buffer, uint16_t offset, uint16_t maxlength);
+struct p4_change_table_entry* create_p4_change_table_entry(char* buffer, uint16_t offset, uint16_t maxlength);
 struct p4_field_match_lpm* add_p4_field_match_lpm(struct p4_add_table_entry* add_table_entry, uint16_t maxlength);
 struct p4_add_table_entry* unpack_p4_add_table_entry(char* buffer, uint16_t offset);
 struct p4_field_match_header* unpack_p4_field_match_header(char* buffer, uint16_t offset);
@@ -273,5 +282,6 @@ struct p4_action_parameter* netconv_p4_action_parameter(struct p4_action_paramet
 struct p4_set_default_action* netconv_p4_set_default_action(struct p4_set_default_action* m);
 struct p4_field_match_header* netconv_p4_field_match_complex(struct p4_field_match_header *m, int* size);
 struct p4_add_table_entry* netconv_p4_add_table_entry(struct p4_add_table_entry* m);
+struct p4_change_table_entry* netconv_p4_change_table_entry(struct p4_change_table_entry* m);
 
 #endif

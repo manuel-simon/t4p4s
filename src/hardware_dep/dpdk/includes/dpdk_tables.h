@@ -14,7 +14,10 @@ typedef uint8_t table_index_t;
 typedef struct extended_table_s {
     void*          rte_table;
     table_index_t  size;
-    uint8_t**      content;
+    union {
+        uint8_t **pointer;
+        uint8_t *inplace;
+    } content;
 } extended_table_t;
 
 //=============================================================================
@@ -24,13 +27,15 @@ void rte_exit_with_errno(const char* table_type, const char* table_name);
 //=============================================================================
 // Table size limits
 
+#define TABLE_ENTRIES 2097152
+
 #ifdef RTE_ARCH_X86_64
-#define HASH_ENTRIES		1024
+#define HASH_ENTRIES		TABLE_ENTRIES
 #else
-#define HASH_ENTRIES		1024
+#define HASH_ENTRIES		TABLE_ENTRIES
 #endif
 #define LPM_MAX_RULES         1024
 #define LPM6_NUMBER_TBL8S (1 << 16)
 
 // #define TABLE_MAX 100000
-#define TABLE_MAX 250000
+#define TABLE_MAX TABLE_ENTRIES

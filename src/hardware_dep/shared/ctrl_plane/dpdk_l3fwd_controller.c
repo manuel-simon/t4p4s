@@ -16,6 +16,7 @@ extern void notify_controller_initialized();
 
 controller c;
 
+
 void fill_macfwd_table(uint8_t mac[6])
 {
     char buffer[2048];

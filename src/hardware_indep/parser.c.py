@@ -51,6 +51,8 @@ for hdr in hlir.header_instances.filterfalse(lambda hdr: hdr.urtype.is_metadata)
     #[ hdr->var_width_field_bitwidth = vwlen;
 
     for fld in hdrtype.fields:
+        if fld.size <= 32: # that appears to be important...
+            #[ pd->fields.attr_field_instance_${hdr.name}_${fld.name} = 0;
         if fld.preparsed and fld.size <= 32:
             #[ EXTRACT_INT32_AUTO_PACKET(pd, HDR(${hdr.name}), FLD(${hdr.name},${fld.name}), value32)
             #[ pd->fields.FLD(${hdr.name},${fld.name}) = value32;

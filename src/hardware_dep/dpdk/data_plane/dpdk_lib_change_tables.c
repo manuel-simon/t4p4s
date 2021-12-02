@@ -18,20 +18,26 @@ void change_replica(int socketid, int tid, int replica) {
     }
 }
 
+#define HAS_REPLICAS(socketid, tableid) state[socketid].tables[tableid][0]->has_replicas
+
 #define CHANGE_TABLE(fun, par...) \
 { \
-    { \
-        int current_replica = state[socketid].active_replica[tableid]; \
-        int next_replica = (current_replica+1)%NB_REPLICA; \
-        fun(state[socketid].tables[tableid][next_replica], par); \
-        change_replica(socketid, tableid, next_replica); \
-        usleep(TABCHANGE_SLEEP_MICROS); \
-        for (int current_replica = 0; current_replica < NB_REPLICA; current_replica++) { \
-            if (current_replica != next_replica) { \
-                fun(state[socketid].tables[tableid][current_replica], par); \
-            } \
-        } \
-    } \
+    {                             \
+        if (HAS_REPLICAS(socketid, tableid)) { \
+            int current_replica = state[socketid].active_replica[tableid]; \
+            int next_replica = (current_replica+1)%NB_REPLICA; \
+            fun(state[socketid].tables[tableid][next_replica], par); \
+            change_replica(socketid, tableid, next_replica); \
+            usleep(TABCHANGE_SLEEP_MICROS); \
+            for (int current_replica = 0; current_replica < NB_REPLICA; current_replica++) { \
+                if (current_replica != next_replica) { \
+                    fun(state[socketid].tables[tableid][current_replica], par); \
+                }                 \
+            }                  \
+        } else { \
+            fun(state[socketid].tables[tableid][0], par); \
+        }    \
+    }   \
 }
 
 extern char* get_entry_action_name(void* entry);
@@ -45,6 +51,18 @@ extern char* get_entry_action_name(void* entry);
 #else
 #define FORALL_PRINTOUT(txt1, txt2, b, should_print)
 #endif
+
+#define CHANGE_TABLE_NOREPLICA(fun, par...) \
+{ \
+    {   \
+        if (HAS_REPLICAS(stateid, tableid)) { \
+            int current_replica = state[socketid].active_replica[tableid]; \
+            fun(state[socketid].tables[tableid][current_replica], par);    \
+        } else {                            \
+            fun(state[socketid].tables[tableid][0], par);         \
+        }                                    \
+    } \
+}
 
 #define FORALLNUMANODES(txt1, txt2, b, should_print) \
     for (int socketid = 0; socketid < NB_SOCKETS; socketid++) \
@@ -66,6 +84,9 @@ extern char* get_entry_action_name(void* entry);
 void exact_add_promote(int tableid, uint8_t* key, uint8_t* value, bool should_print) {
     FORALLNUMANODES(Add, "/" T4LIT(exact), CHANGE_TABLE(exact_add, key, value), should_print)
 }
+void exact_change_promote(int tableid, uint8_t* key, uint8_t* value, bool should_print) {
+    FORALLNUMANODES(Add, "/" T4LIT(exact), CHANGE_TABLE(exact_change, key, value), should_print)
+}
 void lpm_add_promote(int tableid, uint8_t* key, uint8_t depth, uint8_t* value, bool should_print) {
     FORALLNUMANODES(Add, "/" T4LIT(LPM), CHANGE_TABLE(lpm_add, key, depth, value), should_print)
 }
@@ -75,3 +96,54 @@ void ternary_add_promote(int tableid, uint8_t* key, uint8_t* mask, uint8_t* valu
 void table_setdefault_promote(int tableid, uint8_t* value) {
     FORALLNUMANODES_NOKEY(Set default action on table, "", CHANGE_TABLE(table_set_default_action, value))
 }
+
+#define CHANGE_TABLE_NOREPLICA_SEQ(fun, par...) \
+{ \
+    {                                           \
+        int current_replica = HAS_REPLICAS(socketid, tableid) ? state[socketid].active_replica[tableid] : 0;  \
+        for (uint64_t idx = 0; idx < nr_entries; idx++) { \
+            fun(state[socketid].tables[tableid][current_replica], par); \
+        } \
+    } \
+}
+
+#define CHANGE_TABLE_SEQ(fun, par...) \
+{ \
+    { \
+        if (HAS_REPLICAS(socketid, tableid))  { \
+            int current_replica = state[socketid].active_replica[tableid]; \
+            int next_replica = (current_replica+1)%NB_REPLICA; \
+            for (uint64_t idx = 0; idx < nr_entries; idx++) { \
+                fun(state[socketid].tables[tableid][next_replica], par); \
+            } \
+            change_replica(socketid, tableid, next_replica); \
+            usleep(TABCHANGE_SLEEP_MICROS); \
+            for (int current_replica = 0; current_replica < NB_REPLICA; current_replica++) { \
+                if (current_replica != next_replica) { \
+                    for (uint64_t idx = 0; idx < nr_entries; idx++) { \
+                        fun(state[socketid].tables[tableid][current_replica], par); \
+                    } \
+                } \
+            } \
+        } else {  \
+            for (uint64_t idx = 0; idx < nr_entries; idx++) { \
+                fun(state[socketid].tables[tableid][0], par); \
+            } \
+        } \
+    } \
+}
+
+//void exact_add_promote_multiple(int tableid, uint8_t** keys, uint8_t* value, uint64_t nr_entries)
+//{
+//    FORALLNUMANODES(add, to exact table, CHANGE_TABLE_SEQ(exact_add, keys[idx], value))
+//}
+//
+//void ternary_add_promote_multiple(int tableid, uint8_t** keys, uint8_t** masks, uint8_t* value, uint64_t nr_entries)
+//{
+//    FORALLNUMANODES(add, to ternary table, CHANGE_TABLE_SEQ(ternary_add, keys[idx], masks[idx], value))
+//}
+//
+//void lpm_add_promote_multiple(int tableid, uint8_t** keys, uint8_t* depths, uint8_t* value, uint64_t nr_entries)
+//{
+//    FORALLNUMANODES(add, to lpm table, CHANGE_TABLE_SEQ(lpm_add, keys[idx], depths[idx], value))
+//}

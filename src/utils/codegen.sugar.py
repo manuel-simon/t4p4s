@@ -182,8 +182,8 @@ def gen_extern_format_parameter(expr, par, packets_or_bytes_override = None):
                 #aft[ MODIFY_BYTEBUF_BYTEBUF_PACKET(pd, HDR(${hdrname}), ${fldname}, $varname, ${expr_width});
                 #[ $varname
 
-
-def gen_format_statement_fieldref_wide(dst, src, dst_width, dst_is_vw, dst_bytewidth, dst_name, dst_hdr_name, dst_fld_name):
+def gen_format_statement_ref_wide(dst, src, dst_width, dst_is_vw, dst_bytewidth, dst_name, dst_hdr_name, dst_fld_name):
+    global src_pointer
     if src.node_type == 'Member':
         src_pointer = generate_var_name('tmp_fldref')
         #[ uint8_t $src_pointer[$dst_bytewidth];
@@ -204,7 +204,7 @@ def gen_format_statement_fieldref_wide(dst, src, dst_width, dst_is_vw, dst_bytew
                 dst_bytewidth = f'({src_vw_bitwidth}/8)'
     elif src.node_type == 'PathExpression':
         name = src.path.name
-        refbase = "local_vars->" if is_control_local_var(name) else 'parameters.'
+        refbase = "local_vars->" if is_control_local_var(name) else 'parameters->'
         src_pointer = f'{refbase}{name}'
     elif src.node_type == 'Constant':
         src_pointer = generate_var_name('tmp_fldref_const')
@@ -216,9 +216,13 @@ def gen_format_statement_fieldref_wide(dst, src, dst_width, dst_is_vw, dst_bytew
         src_pointer = 'NOT_SUPPORTED'
         addError('formatting statement', f'Assignment to unsupported field in: {format_expr(dst)} = {src}')
 
-    dst_fixed_size = dst.expr.hdr_ref.urtype.size - dst.fld_ref.size
+def gen_format_statement_fieldref_wide(dst, src, dst_width, dst_is_vw, dst_bytewidth, dst_name, dst_hdr_name, dst_fld_name):
+    global src_pointer
+    src_pointer = ''
+    #= gen_format_statement_ref_wide(dst, src, dst_width, dst_is_vw, dst_bytewidth, dst_name, dst_hdr_name, dst_fld_name)
 
     if dst_is_vw:
+        dst_fixed_size = dst.expr.hdr_ref.urtype.size - dst.fld_ref.size
         #[ pd->headers[$dst_hdr_name].var_width_field_bitwidth = get_var_width_bitwidth(pstate);
         #[ pd->headers[$dst_hdr_name].length = ($dst_fixed_size + pd->headers[$dst_hdr_name].var_width_field_bitwidth)/8;
 
@@ -232,22 +236,47 @@ def gen_format_statement_fieldref_wide(dst, src, dst_width, dst_is_vw, dst_bytew
     #[      $dst_bytewidth
     #[      );
 
+
+def gen_format_statement_parameter_wide(dst, src, dst_width, dst_is_vw, dst_bytewidth, dst_name, dst_hdr_name, dst_fld_name):
+    global src_pointer
+    src_pointer = ''
+    #= gen_format_statement_ref_wide(dst, src, dst_width, dst_is_vw, dst_bytewidth, dst_name, dst_hdr_name, dst_fld_name)
+
+    if dst_is_vw:
+        addError("Error formatting parameter expression", "Varbit is not supported for parameter assignment")
+        return ''
+    refbase = "local_vars->" if is_control_local_var(dst.decl_ref.name) else 'parameters->'
+    dst_pointer = '{}{}'.format(refbase, dst.decl_ref.name)
+    # src_pointer is array in this case
+    #[ memcpy(&($dst_pointer), $src_pointer, $dst_bytewidth);
+
+
 def is_primitive(typenode):
     """Returns true if the argument node is compiled to a non-reference C type."""
     # TODO determine better if the source is a reference or not
     return typenode.node_type == "Type_Boolean" or (typenode.node_type == 'Type_Bits' and typenode.size <= 32)
 
-
-def gen_format_statement_fieldref_short(dst, src, dst_width, dst_is_vw, dst_bytewidth, dst_name, dst_hdr_name, dst_fld_name):
-    varname = 'value32'
+def gen_format_statement_ref_short(dst, src, dst_width, dst_is_vw, dst_bytewidth, dst_name, dst_hdr_name, dst_fld_name, varname='value32'):
     if src.node_type == 'PathExpression':
         indirection = "&" if is_primitive(src.type) else ""
         var_name = src.path.name
-        refbase = "local_vars->" if is_control_local_var(src.decl_ref.name) else 'parameters.'
+        refbase = "local_vars->" if is_control_local_var(src.decl_ref.name) else 'parameters->'
         #[ memcpy(&$varname, $indirection($refbase${var_name}), $dst_bytewidth);
     else:
         #[ $varname = ${format_expr(src)};
 
+
+def gen_format_statement_parameter_short(dst, src, dst_width, dst_is_vw, dst_bytewidth, dst_name, dst_hdr_name, dst_fld_name, varname='value32'):
+    varname = 'value32'
+    #= gen_format_statement_ref_short(dst, src, dst_width, dst_is_vw, dst_bytewidth, dst_name, dst_hdr_name, dst_fld_name, varname)
+    indirection = "&" if is_primitive(dst.type) else ""
+    refbase = "local_vars->" if is_control_local_var(dst.decl_ref.name) else 'parameters->'
+    #[ memcpy($indirection($refbase${dst.decl_ref.name}), &$varname, $dst_bytewidth);
+
+
+def gen_format_statement_fieldref_short(dst, src, dst_width, dst_is_vw, dst_bytewidth, dst_name, dst_hdr_name, dst_fld_name):
+    varname = 'value32'
+    #= gen_format_statement_ref_short(dst, src, dst_width, dst_is_vw, dst_bytewidth, dst_name, dst_hdr_name, dst_fld_name, varname)
 
     #[ // MODIFY_INT32_INT32_AUTO_PACKET(pd, $dst_hdr_name, $dst_fld_name, $varname)
     #[ set_field((fldT[]){{pd, $dst_hdr_name, $dst_fld_name}}, 0, $varname, $dst_width);
@@ -255,12 +284,7 @@ def gen_format_statement_fieldref_short(dst, src, dst_width, dst_is_vw, dst_byte
 
 def gen_format_statement_fieldref(dst, src):
     #TODO: handle preparsed fields, width assignment for vw fields and assignment to buffer instead header fields
-    dst_width = dst.type.size
-    dst_is_vw = dst.type.node_type == 'Type_Varbits'
-    dst_bytewidth = (dst_width+7)//8
-
-    assert(dst_width == src.type.size)
-    assert(dst_is_vw == (src.type.node_type == 'Type_Varbits'))
+    dst_width, dst_is_vw, dst_bytewidth = extract_sizes(dst, src)
 
     dst_name = dst.expr.member if dst.expr.node_type == 'Member' else dst.expr.path.name if dst.expr('hdr_ref', lambda h: h.urtype.is_metadata) else dst.expr._hdr_ref._path.name
     dst_hdr_name, dst_fld_name = member_to_hdr_fld(dst)
@@ -269,6 +293,24 @@ def gen_format_statement_fieldref(dst, src):
         #= gen_format_statement_fieldref_short(dst, src, dst_width, dst_is_vw, dst_bytewidth, dst_name, dst_hdr_name, dst_fld_name)
     else:
         #= gen_format_statement_fieldref_wide(dst, src, dst_width, dst_is_vw, dst_bytewidth, dst_name, dst_hdr_name, dst_fld_name)
+
+def gen_format_statement_parameter(dst, src):
+    dst_width, dst_is_vw, dst_bytewidth = extract_sizes(dst, src)
+
+    if dst_width <= 32:
+        #= gen_format_statement_parameter_short(dst, src, dst_width, dst_is_vw, dst_bytewidth, "", "", "")
+    else:
+        #= gen_format_statement_parameter_wide(dst, src, dst_width, dst_is_vw, dst_bytewidth, "", "", "")
+
+def extract_sizes(dst, src):
+    dst_width = dst.type.size
+    dst_is_vw = dst.type.node_type == 'Type_Varbits'
+    dst_bytewidth = (dst_width+7)//8
+
+    assert(dst_width == src.type.size)
+    assert(dst_is_vw == (src.type.node_type == 'Type_Varbits'))
+
+    return dst_width, dst_is_vw, dst_bytewidth
 
 
 def is_atomic_block(blckstmt):
@@ -364,6 +406,8 @@ def gen_format_statement(stmt):
         src = stmt.right
         if 'fld_ref' in dst:
             #= gen_format_statement_fieldref(dst, src)
+        elif 'decl_ref' in dst:
+            #= gen_format_statement_parameter(dst, src)
         else:
             #= gen_do_assignment(dst, src)
     elif stmt.node_type == 'BlockStatement':
@@ -1015,12 +1059,16 @@ def gen_format_expr(e, format_as_value=True, expand_parameters=False, needs_vari
         name = e.path.name
         is_local = is_control_local_var(name)
         is_abs = expand_parameters and not e.path.absolute
+        is_param = "decl_ref" in e and e.decl_ref.node_type == 'Parameter'
+        is_action = "action_ref" in e
         if is_local:
             #[ local_vars->${name}
-        elif is_abs:
-            #[ parameters.${name}
+        elif is_abs or is_param:
+            #[ parameters->${name}
+        elif is_action:
+            #[ ${e.action_ref.name}
         else:
-            pass
+            #[ ${name}
     elif nt == 'Argument':
         #= format_expr(e.expression)
     else:
