@@ -125,7 +125,7 @@ def gen_fill_key_component(k, idx, byte_width, tmt, kmt):
     elif ke.node_type == 'Slice':
         #[     // TODO fill Slice component properly (call gen_fill_key_component_slice)
     else:
-        #[     memcpy(&(key->${get_key_name(k, idx)}), field_matches[$idx], $byte_width);
+        #[     memcpy(&(key->${get_key_name(k, idx)}), field_matches[$idx]->bitmap, $byte_width);
         if tmt == "lpm":
             if kmt == "exact":
                 #[     prefix_length += ${get_key_byte_width(k)};
