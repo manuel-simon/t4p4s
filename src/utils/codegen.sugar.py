@@ -708,7 +708,7 @@ def gen_format_extern_single(m, mcall, smem_type, is_possibly_multiple, packets_
 
 
 def is_ref(node):
-    not_of_type   = node.node_type not in ('Constant', 'BoolLiteral', 'MethodCallExpression')
+    not_of_type   = node.node_type not in ('Constant', 'BoolLiteral', 'MethodCallExpression', 'StringLiteral')
     not_of_urtype = node.urtype.node_type not in ('Type_Error', 'Type_Enum', 'Type_List')
     return not_of_type and not_of_urtype
 
