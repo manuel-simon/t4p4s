@@ -627,7 +627,7 @@ if [ "$(optvalue p4)" == off ] && [ "$(optvalue c)" == off ] && [ "$(optvalue ru
     OPTS[run]=on
 fi
 
-T4P4S_CC=${T4P4S_CC-$(find_tool "-" clang gcc)}
+T4P4S_CC=${T4P4S_CC-$(find_tool "-" gcc)}
 if [[ ! "$T4P4S_CC" =~ "clang" ]]; then
     # note: when using gcc, only lld seems to be supported, not lld-VSN
     T4P4S_LD=${T4P4S_LD-$(find_tool lld bfd gold)}
