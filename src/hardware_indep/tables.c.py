@@ -45,7 +45,7 @@ for table in hlir.tables:
     #[  },
 
     #[  .min_size = 0,
-    #[  .max_size = 250000,
+    #[  .max_size = 1048576,
 
     #{  #ifdef T4P4S_DEBUG
     #[      .short_name= "${table.short_name}",

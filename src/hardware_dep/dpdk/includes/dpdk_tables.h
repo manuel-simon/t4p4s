@@ -25,12 +25,12 @@ void rte_exit_with_errno(const char* table_type, const char* table_name);
 // Table size limits
 
 #ifdef RTE_ARCH_X86_64
-#define HASH_ENTRIES		1024
+#define HASH_ENTRIES		1048576
 #else
-#define HASH_ENTRIES		1024
+#define HASH_ENTRIES		1048576
 #endif
 #define LPM_MAX_RULES         1024
 #define LPM6_NUMBER_TBL8S (1 << 16)
 
 // #define TABLE_MAX 100000
-#define TABLE_MAX 250000
+#define TABLE_MAX 1048576
