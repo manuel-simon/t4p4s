@@ -114,18 +114,18 @@ def gen_fill_key_component_slice(ke):
     compiler_common.post_statement_buffer = ""
 
 
-def gen_fill_key_component(k, idx, byte_width, tmt, kmt):
+def gen_fill_key_component(k, idx, byte_width, tmt, kmt, all_width):
     ke = k.expression
     if ke.node_type == 'MethodCallExpression':
         # TODO can this be anything other than a call to isValid?
         target = generate_var_name('method_call')
 
-        value = 1;
+        value = 1
         #[     ${format_type(ke.type, target)} = $value;
     elif ke.node_type == 'Slice':
         #[     // TODO fill Slice component properly (call gen_fill_key_component_slice)
     else:
-        #[     memcpy(&(key->${get_key_name(k, idx)}), field_matches[$idx]->bitmap, $byte_width);
+        #[     memcpy(&key[ $all_width ], field_matches[$idx]->bitmap, $byte_width);
         if tmt == "lpm":
             if kmt == "exact":
                 #[     prefix_length += ${get_key_byte_width(k)};
@@ -141,7 +141,7 @@ for table in hlir.tables:
     extra_return = {'exact': '', 'lpm': 'return prefix_length;', 'ternary': ''}
 
     #[ // note: ${table.name}, $tmt, ${table.key_length_bytes}
-    #{ ${return_t[tmt]} ${table.name}_setup_key(p4_field_match_${tmt}_t** field_matches, table_key_${table.name}_t* key) {
+    #{ ${return_t[tmt]} ${table.name}_setup_key(p4_field_match_${tmt}_t** field_matches, uint8_t key[]) {
     if extra_init[tmt]:
         #[     ${extra_init[tmt]}
 
@@ -153,10 +153,11 @@ for table in hlir.tables:
         if kmt == "ternary":
             #[     /* TODO ternary */
 
-
+    all_width = 0
     for idx, k in enumerate(sorted(table.key.keyElements, key = lambda k: k.match_order)):
         byte_width = get_key_byte_width(k)
-        #= gen_fill_key_component(k, idx, byte_width, tmt, kmt)
+        #= gen_fill_key_component(k, idx, byte_width, tmt, kmt, all_width)
+        all_width = all_width + byte_width
 
     if extra_return[tmt]:
         #[     ${extra_return[tmt]}
@@ -216,7 +217,7 @@ for table in hlir.tables:
     #[
 
     extra_params = "".join(f'{p}, ' for p in extra_names[tmt])
-    has_fields = "false" if len(action.action_object.parameters.parameters) == 0 else "true"
+    has_fields = "true" if len(action.action_object.parameters.parameters) == 0 else "true"
     #[     ${table.matchType.name}_add_promote(TABLE_${table.name}, (uint8_t*)&key, ${extra_params} (uint8_t*)&action, false, ${has_fields});
 
     #} }

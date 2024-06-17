@@ -28,7 +28,7 @@ for table in hlir.tables:
 
             if f.size <= 32:
                 #[     EXTRACT_INT32_BITS_PACKET(pd, HDR(${hi_name}), FLD(${f.header.name},${f.field_name}), *(uint32_t*)key);
-                #[     key += sizeof(uint32_t);
+                #[     key += sizeof(uint${f.size}_t);
             elif f.size > 32 and f.size % 8 == 0:
                 byte_width = (f.size+7)//8
                 #[     EXTRACT_BYTEBUF_PACKET(pd, HDR(${hi_name}), FLD(${f.header.name},${f.field_name}), key);
