@@ -24,7 +24,11 @@ extern struct rte_mempool* pktmbuf_pool[NB_SOCKETS];
 
 struct rte_mbuf* deparse_mbuf;
 
-// ------------------------------------------------------
+// -----i-------------------------------------------------
+
+#ifndef NO_DRAIN
+    #define NO_DRAIN 0
+#endif
 
 /* Send burst of packets on an output interface */
 static inline void send_burst(struct lcore_conf *conf, uint16_t n, uint8_t port)
@@ -42,9 +46,9 @@ static inline void send_burst(struct lcore_conf *conf, uint16_t n, uint8_t port)
 
 void tx_burst_queue_drain(LCPARAMS) {
     uint64_t cur_tsc = rte_rdtsc();
-
     uint64_t diff_tsc = cur_tsc - lcdata->prev_tsc;
-    if (unlikely(diff_tsc > lcdata->drain_tsc)) {
+
+    if (NO_DRAIN || unlikely(diff_tsc > lcdata->drain_tsc)) {
         for (unsigned portid = 0; portid < get_nb_ports(); portid++) {
             if (lcdata->conf->hw.tx_mbufs[portid].len == 0)
                 continue;
@@ -54,8 +58,9 @@ void tx_burst_queue_drain(LCPARAMS) {
                        (uint8_t) portid);
             lcdata->conf->hw.tx_mbufs[portid].len = 0;
         }
-
+#if NO_DRAIN==0
         lcdata->prev_tsc = cur_tsc;
+#endif
     }
 }
 
