@@ -10,8 +10,17 @@
 
 #include <rte_ip.h>
 
+
+extern ebpf_prog_t mid_ebpf;
+
 void transfer_to_egress(packet_descriptor_t* pd)
 {
+    #ifdef MID_EBPF
+        int8_t ret;
+        if (mid_ebpf.bpf_prog != NULL) {
+            extern_ebpf_prog_exec_prog_packet(false, false, &ret, &mid_ebpf, pd, NULL);
+        }
+    #endif
 }
 
 int extract_egress_port(packet_descriptor_t* pd) {

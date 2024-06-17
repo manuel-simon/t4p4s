@@ -17,6 +17,7 @@ from compiler_common import unique_everseen
 
 # TODO this should not be here in the indep section
 #[ #include "dpdk_smem.h"
+#[ #include "ebpf.h"
 
 #[ #define FIELD(name, length) uint8_t name[(length + 7) / 8];
 
@@ -61,14 +62,13 @@ for table in hlir.tables:
     for action in table.actions:
         aname = action.action_object.name
         mname = action.expression.method.path.name
-
         #[ void action_code_$aname(action_${mname}_params_t, SHORT_STDPARAMS);
 
 non_ctr_locals = ('counter', 'direct_counter', 'meter')
 
 for ctl in hlir.controls:
     #{ typedef struct {
-    for local_var_decl in ctl.local_var_decls.filterfalse('urtype.node_type', 'Type_Header'):
+    for local_var_decl in ctl.local_var_decls.filterfalse('urtype.node_type', 'Type_Header').filterfalse('urtype.node_type', 'Type_Extern'):
         #[     ${format_type(local_var_decl.urtype, varname = local_var_decl.name, resolve_names = False)};
 
     # TODO is there a more appropriate way to store registers?
@@ -81,3 +81,4 @@ for ctl in hlir.controls:
 
 #[ void set_hdr_valid(header_instance_t hdr, SHORT_STDPARAMS);
 #[ void set_hdr_invalid(header_instance_t hdr, SHORT_STDPARAMS);
+

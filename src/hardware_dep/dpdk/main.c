@@ -6,11 +6,14 @@
 
 #include <rte_ethdev.h>
 #include <rte_mempool.h>
+#include <rte_bpf.h>
+#include <ebpf.h>
 
 
 volatile int packet_counter = 0;
 volatile int packet_with_error_counter = 0;
 
+volatile struct rte_bpf *bpf_prog = NULL;
 
 void get_broadcast_port_msg(char result[256], int ingress_port) {
     uint8_t nb_ports = get_port_count();

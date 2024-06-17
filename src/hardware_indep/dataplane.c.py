@@ -102,13 +102,13 @@ for ctl in hlir.controls:
 #[ void process_packet(STDPARAMS)
 #{ {
 for idx, ctl in enumerate(hlir.controls):
+    if hlir.news.model == 'V1Switch' and idx == 1:
+        #[     transfer_to_egress(pd);
     if len(ctl.body.components) == 0:
         #[     // skipping empty control ${ctl.name}
     else:
         #[     control_${ctl.name}(STDPARAMS_IN);
 
-    if hlir.news.model == 'V1Switch' and idx == 1:
-        #[     transfer_to_egress(pd);
     if ctl.name == 'egress':
         #[     // TODO temporarily disabled
         #[     // update_packet(STDPARAMS_IN); // we need to update the packet prior to calculating the new checksum

@@ -38,8 +38,9 @@ def gen_make_smem_code(smem, table = None):
 
 #[ #include "common.h"
 #[ #include "aliases.h"
-#[ #include "dpdk_smem.h"
 #[ #include "gen_include.h"
+#[ #include "dpdk_smem.h"
+#[ #include "ebpf.h"
 
 #{ typedef struct {
 for table, smem in hlir.all_meters + hlir.all_counters:
@@ -51,7 +52,9 @@ for smem in unique_everseen((smem for table, smem in hlir.all_meters + hlir.all_
 for smem in hlir.registers:
     #= gen_make_smem_code(smem)
 
-
+#other externs
+for extern in hlir.extern_decl:
+    #[     ${format_type(extern.urtype)} *${extern.type.type_ref.name}_${extern.name};
 
 # temp = {action: action.flatmap('parameters.parameters') for action in hlir.tables.flatmap('control.controlLocals').filter('node_type', 'P4Action')}
 
@@ -71,7 +74,7 @@ for locname, loctype in all_locals:
 
 # Note: currently all control locals are put together into the global state
 for ctl in hlir.controls:
-    for local_var_decl in (ctl.controlLocals['Declaration_Variable'] + ctl.controlLocals['Declaration_Instance']).filterfalse('urtype.node_type', 'Type_Header').filterfalse(lambda n: 'smem_type' in n):
+    for local_var_decl in (ctl.controlLocals['Declaration_Variable'] + ctl.controlLocals['Declaration_Instance']).filterfalse('urtype.node_type', 'Type_Header').filterfalse(lambda n: 'smem_type' in n).filterfalse(lambda n: n in hlir.extern_decl):
         #[     ${format_type(local_var_decl.urtype, varname = local_var_decl.name, resolve_names = False)};
 
 

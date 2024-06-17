@@ -46,6 +46,10 @@ project_source_files = [
 
     srcg / 'stateful_memory.c',
     xtrn / 'dpdkx_smem.c',
+    xtrn / 'ebpf.c',
+    xtrn / 'mac.c',
+    xtrn / 'dpdk_ebpf.c',
+    xtrn / 'mid_ebpf.c',
 ]
 
 build_args = [
@@ -63,4 +67,5 @@ include_dirs = include_directories(
 all_dependencies = [
     dependency('libdpdk'),
     dependency('threads'),
+    dependency('libblake3'),
 ]

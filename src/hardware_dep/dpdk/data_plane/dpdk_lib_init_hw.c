@@ -19,6 +19,25 @@ int numa_on = 1;
 uint16_t            nb_lcore_params;
 struct lcore_params lcore_params[MAX_LCORE_PARAMS];
 
+#ifdef PRE_EBPF
+    extern void pre_ebpf_load_prog_from_memory_all(int8_t *ret, char *path, bool jit);
+    extern void pre_ebpf_unload_prog_all();
+#endif
+
+#ifdef MID_EBPF
+    extern void mid_ebpf_load_prog_from_memory(int8_t *ret, char *filename, bool jit);
+    extern void mid_ebpf_unload_prog();
+#endif
+
+#ifdef POST_EBPF
+    extern void post_ebpf_load_prog_from_memory_all(int8_t *ret, char *path, bool jit);
+    extern void post_ebpf_unload_prog_all();
+#endif
+
+#ifndef EBPF_SEC
+#define EBPF_SEC ".text"
+#endif
+
 //=============================================================================
 // Locals
 
@@ -331,6 +350,33 @@ void dpdk_init_nic()
         debug("Entering promiscous mode on port %d\n", portid);
         rte_eth_promiscuous_enable(portid);
     }
+
+    #ifdef PRE_EBPF
+        int8_t ret_pre_load;
+        #ifdef PRE_EBPF_SRC
+            pre_ebpf_load_prog_from_memory_all(&ret_pre_load, PRE_EBPF_SRC, true);
+        #else
+            pre_ebpf_unload_prog_all();
+        #endif
+    #endif
+
+    #ifdef MID_EBPF
+        int8_t ret_mid_load;
+        #ifdef MID_EBPF_SRC
+            mid_ebpf_load_prog_from_memory(&ret_mid_load, MID_EBPF_SRC, true);
+        #else
+            mid_ebpf_unload_prog();
+        #endif
+    #endif
+
+    #ifdef POST_EBPF
+        int8_t ret_post_load;
+        #ifdef POST_EBPF_SRC
+            post_ebpf_load_prog_from_memory_all(&ret_post_load, POST_EBPF_SRC, true);
+        #else
+            post_ebpf_unload_prog_all();
+        #endif
+    #endif
 
     print_all_ports_link_status(nb_ports, enabled_port_mask);
 }
