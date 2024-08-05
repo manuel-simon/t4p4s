@@ -1,3 +1,44 @@
+# EBPF Extension
+
+We extended T4P4S (see below) to allow for eBPF processor before, after, and in the P4 pipeline.
+Please have a look at our paper [Honey for the Ice Bear - Dynamic eBPF in P4](https://dl.acm.org/doi/10.1145/3672197.3673436) for more details.
+
+
+## HowTo
+
+eBPF processors can be used at different locations (pre, mid, post, extern, extern_pkt) and can be reprogrammed dynamically (static, pre-defined (memory), dynamic by ebpf source (source) or byte code (prog).
+
+### P4 definitions
+The definitions for the extern and extern methods to bind or unbind the different eBPF processors is given in `examples/ebpf.p4` which has to be included in the P4 source code.
+
+#### Extern
+The extern `ebpf_prog` defines the available functions for using an eBPF processor as P4 extern. Please have a look to the comments for each function.
+
+#### Fixed position extern methods
+There exist several functions to load eBPF functionality into the different processors, depending on position (`pre`, `mid`, `post`), authentication (`auth`, or not), and the associated queues/cores (`_all`, or only the current one)
+Have a look to the comments for more information.
+
+##### Load source
+* program is loaded using its path for the `_memory` versions
+* program is loaded from the packet using its source or byte code for the `_source` and `_prog` versions
+
+###### Params
+* first `bit<32>` parameter of the tuple defines the length of the source code
+* the rest define `MAC_LEN`-sized BLAKE3 MAC (for `_auth` versions), followed by the code
+
+###### All/current queue
+* `_all` versions install the processor for all queues/core
+*  other versions only for current queue/core
+
+##### Unload
+* `unload` unloads the program and deactivates the processor for current queue/core
+* `unload_all` unloads the program and deactivates the processor for all queues/cores
+
+
+### Examples
+Examples for the different positions and modes are given in `exammples-ebpf`
+
+
 
 # T₄P₄S, a multitarget P4<sub>16</sub> compiler
 
