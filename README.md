@@ -1,3 +1,11 @@
+# Updatable table entries
+This branch holds the code for updatable data plane table entries in T4P4S.
+Have a look at the paper [High-Performance Match-Action Table Updates from within Programmable Software Data Planes
+](https://dl.acm.org/doi/10.1145/3493425.3502759) for more details.
+
+#### eBPF
+To get the code for [Honey for the Ice Bear - Dynamic eBPF in P4](https://dl.acm.org/doi/10.1145/3672197.3673436) for eBPF extended P4, have a look at the [ebpf](https://github.com/manuel-simon/t4p4s/tree/ebpf) branch.
+
 
 # T₄P₄S, a multitarget P4<sub>16</sub> compiler
 
