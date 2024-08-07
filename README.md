@@ -3,6 +3,8 @@
 We extended T4P4S (see below) to allow for eBPF processor before, after, and in the P4 pipeline.
 Please have a look at our paper [Honey for the Ice Bear - Dynamic eBPF in P4](https://dl.acm.org/doi/10.1145/3672197.3673436) for more details.
 
+#### Updatable table entries
+(For the code for data plane [updatable table entries](https://dl.acm.org/doi/10.1145/3493425.3502759), have a look at the [paper](https://github.com/manuel-simon/t4p4s/tree/paper) branch.
 
 ## HowTo
 
