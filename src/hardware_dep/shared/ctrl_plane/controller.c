@@ -238,8 +238,10 @@ int send_p4_msg(controller c, char* buffer, int length)
 
 	memcpy(mem_cell->data, buffer, length);
 	mem_cell->length = length;
-	if( fifo_add_msg( &(ct->output_queue), (void*)mem_cell )==0)
+	if( fifo_add_msg( &(ct->output_queue), (void*)mem_cell )==0) {
 		printf("ERR!!\n");
+		fprintf(stderr, "Error while sending p4_msg\n");
+	}
 
 	return 0;
 }

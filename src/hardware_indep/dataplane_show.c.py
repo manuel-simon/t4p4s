@@ -98,7 +98,7 @@ for table, table_info in table_infos:
         dbg_action_name = dbg_action.expression.method.path.name
         #{         if (!strcmp("${dbg_action_name}", action_names[entry->action.action_id])) {
         #[             ${table.name}_show_params_${aoname}(params_txt, &(entry->action.${aoname}_params));
-        #[             apply_show_hit_with_key_msg(key, hit, table_config[TABLE_${table.name}].entry.key_size, ${table.key_length_bytes}, "${table.matchType.name}", action_short_names[entry->action.action_id], params_txt, "${table_info}", STDPARAMS_IN);
+        #[             apply_show_hit_with_key_msg(key, hit, table_config[TABLE_${table.name}].entry.key_size, ${table.key_length_bytes}, "${table.match_type_code}", action_short_names[entry->action.action_id], params_txt, "${table_info}", STDPARAMS_IN);
         #}         }
     #}     }
     #[

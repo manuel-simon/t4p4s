@@ -49,8 +49,22 @@ struct p4_add_table_entry* create_p4_add_table_entry(char* buffer, uint16_t offs
 	return add_table_entry;
 }
 
+struct p4_change_table_entry* create_p4_change_table_entry(char* buffer, uint16_t offset, uint16_t maxlength) {
+    struct p4_change_table_entry* change_table_entry;
+    if (offset+sizeof(struct p4_change_table_entry) >= maxlength) return 0; /* buffer overflow */
+    change_table_entry = (struct p4_change_table_entry*)(buffer + offset);
+    change_table_entry->header.length = sizeof (struct p4_change_table_entry);
+    change_table_entry->header.type = P4T_MODIFY_TABLE_ENTRY;
+    change_table_entry->read_size = 0;
+    change_table_entry->table_name[0] = '\0';
+    return change_table_entry;
+}
+
 inline struct p4_add_table_entry* netconv_p4_add_table_entry(struct p4_add_table_entry* m) {
 	return m; /*nothing to do*/
+}
+inline struct p4_change_table_entry* netconv_p4_change_table_entry(struct p4_change_table_entry* m) {
+    return m; /*nothing to do*/
 }
 
 struct p4_field_match_lpm* add_p4_field_match_lpm(struct p4_add_table_entry* add_table_entry, uint16_t maxlength) {
@@ -230,7 +244,9 @@ inline struct p4_action* unpack_p4_action(char* buffer, uint16_t offset) {
 
 struct p4_action_parameter* add_p4_action_parameter(struct p4_header* header, struct p4_action* action, uint16_t maxlength) {
         struct p4_action_parameter* action_p;
-        if (header->length + sizeof(struct p4_action_parameter) > maxlength) return 0; /* buffer overflow */
+        if (header->length + sizeof(struct p4_action_parameter) > maxlength) {
+                fprintf(stderr, "       BUFFER OVERFLOW!\n");
+                return 0;} /* buffer overflow */
         action_p = (struct p4_action_parameter*)( ( (char*)header ) + header->length);
         header->length += sizeof(struct p4_action_parameter);
         action->param_size += 1;

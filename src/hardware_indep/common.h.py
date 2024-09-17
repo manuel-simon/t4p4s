@@ -60,6 +60,14 @@ for typedef in hlir.typedefs:
     #[ typedef ${format_type(typedef.type)} ${typedef.name};
 #[
 
+
+#{ typedef enum {
+for table in hlir.tables:
+    #[     TABLE_${table.name},
+#[ TABLE_,
+#} } table_name_t;
+#[
+
 #[ void do_assignment(header_instance_t dst_hdr, header_instance_t src_hdr, SHORT_STDPARAMS);
 #[ void set_hdr_valid(header_instance_t hdr, SHORT_STDPARAMS);
 #[ void set_hdr_invalid(header_instance_t hdr, SHORT_STDPARAMS);

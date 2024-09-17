@@ -15,6 +15,9 @@
     #include <stdio.h>
 #endif
 
+extern struct rte_mempool* pktmbuf_pool[NB_SOCKETS];
+extern int get_socketid(unsigned lcore_id);
+
 
 void initialize_args(int argc, char **argv);
 void initialize_nic();
@@ -46,7 +49,7 @@ unsigned get_pkt_count_in_group();
 unsigned get_queue_count();
 void send_single_packet(packet* pkt, int egress_port, int ingress_port, bool send_clone, LCPARAMS);
 void send_broadcast_packet(int egress_port, int ingress_port, LCPARAMS);
-struct lcore_data init_lcore_data();
+struct lcore_data init_lcore_data(const bool recv_pkts, const bool recv_evts);
 packet* clone_packet(packet* pd, struct rte_mempool* mempool);
 void init_parser_state(parser_state_t*);
 void init_table_default_actions();

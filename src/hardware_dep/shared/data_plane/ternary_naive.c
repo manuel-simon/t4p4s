@@ -4,7 +4,7 @@
 #include "ternary_naive.h"
 
 ternary_table*
-naive_ternary_create(uint8_t keylen, uint8_t max_size)
+naive_ternary_create(uint8_t keylen, uint64_t max_size)
 {
     ternary_table* t = malloc(sizeof(ternary_table));
     t->entries = malloc(sizeof(ternary_entry)*max_size);
@@ -50,7 +50,10 @@ naive_ternary_lookup(ternary_table* t, uint8_t* key)
                 break;
             }
         }
-        if(match) res = e;
+        if(match) { 
+            res = e;
+            break;
+        }
     }
     return match ? res->value : NULL;
 }

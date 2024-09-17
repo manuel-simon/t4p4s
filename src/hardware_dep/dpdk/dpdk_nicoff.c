@@ -558,7 +558,7 @@ void init_storage() {
 
 extern void init_async_data(struct lcore_data *lcdata);
 
-struct lcore_data init_lcore_data() {
+struct lcore_data init_lcore_data(const bool, const bool) {
     t4p4s_init_global_stats();
     struct lcore_data lcdata = (struct lcore_data) {
         .conf       = &lcore_conf[rte_lcore_id()],

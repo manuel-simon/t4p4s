@@ -11,17 +11,11 @@
 for table in hlir.tables:
     #{ typedef struct {
     #[     ${table.name}_action_t  action;
+    if (table.used_writable and table.synced):
+        #[     lock_t                   lock;
     #[     entry_validity_t        is_entry_valid;
     #} } table_entry_${table.name}_t;
     #[
-
-
-#{ typedef enum {
-for table in hlir.tables:
-    #[     TABLE_${table.name},
-#[ TABLE_,
-#} } table_name_t;
-#[
 
 
 #[ void exact_add_promote  (table_name_t tableid, uint8_t* key,                uint8_t* value, bool is_const_entry, bool should_print);
@@ -43,3 +37,6 @@ for table in hlir.tables:
 
 #[ // Computes the location of the validity field of the entry.
 #[ bool* entry_validity_ptr(uint8_t* entry, lookup_table_t* t);
+
+#[ // Computes the location of the lock field of the entry.
+#[ lock_t* entry_lock_ptr(uint8_t* entry, lookup_table_t* t);

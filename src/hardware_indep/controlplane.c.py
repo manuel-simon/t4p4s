@@ -125,16 +125,16 @@ def gen_fill_key_component(k, idx, byte_width, tmt, kmt):
     elif ke.node_type == 'Slice':
         #[     // TODO fill Slice component properly (call gen_fill_key_component_slice)
     else:
-        #[     memcpy(&(key->${get_key_name(k, idx)}), field_matches[$idx], $byte_width);
+        #[     memcpy(&(key->${get_key_name(k, idx)}), &(field_matches[$idx]->bitmap), $byte_width);
         if tmt == "lpm":
-            if kmt == "exact":
+            if kmt == "exact" or kmt == "exact_inplace":
                 #[     prefix_length += ${get_key_byte_width(k)};
             if kmt == "lpm":
                 #[     prefix_length += $byte_width;
 
 
 for table in hlir.tables:
-    tmt = table.matchType.name
+    tmt = table.match_type_code
 
     return_t     = {'exact': 'void', 'lpm': 'uint8_t', 'ternary': 'void'}
     extra_init   = {'exact': '', 'lpm': 'uint8_t prefix_length = 0;', 'ternary': ''}
@@ -200,8 +200,32 @@ for table in hlir.tables:
     #} }
     #[
 
+
 for table in hlir.tables:
-    tmt = table.matchType.name
+    #{ bool ${table.name}_setup_action_wo_params(${table.name}_action_t* action, const char* action_name) {
+    for idx, action in enumerate(table.actions):
+        if idx == 0:
+            #{     if (strcmp("${action.action_object.canonical_name}", action_name)==0) {
+        else:
+            #[     } else if (strcmp("${action.action_object.canonical_name}", action_name)==0) {
+
+        #[         action->action_id = action_${action.action_object.name};
+
+        for j, p in enumerate(action.action_object.parameters.parameters):
+            size = p.urtype.size
+
+    valid_actions = ", ".join(f'" T4LIT({a.action_object.canonical_name},action) "' for a in table.actions)
+    #[     } else {
+    #[         debug(" $$[warning]{}{!!!! Table add entry} on table $$[table]{table.canonical_name}: action name $$[warning]{}{mismatch}: $$[action]{}{%s}, expected one of ($valid_actions).\n", action_name);
+    #[         return false;
+    #}     }
+
+    #[     return true;
+    #} }
+    #[
+
+for table in hlir.tables:
+    tmt = table.match_type_code
     #{ void ${table.name}_add_table_entry(p4_ctrl_msg_t* ctrl_m) {
     #[     ${table.name}_action_t action;
     #[     bool success = ${table.name}_setup_action(&action, (p4_action_parameter_t**)ctrl_m->action_params, ctrl_m->action_name);
@@ -217,7 +241,7 @@ for table in hlir.tables:
 
     extra_params = "".join(f'{p}, ' for p in extra_names[tmt])
     has_fields = "false" if len(action.action_object.parameters.parameters) == 0 else "true"
-    #[     ${table.matchType.name}_add_promote(TABLE_${table.name}, (uint8_t*)&key, ${extra_params} (uint8_t*)&action, false, ${has_fields});
+    #[     ${table.match_type_code}_add_promote(TABLE_${table.name}, (uint8_t*)&key, ${extra_params} (uint8_t*)&action, false, true);
 
     #} }
     #[
@@ -342,6 +366,7 @@ for table, smem in hlir.all_counters:
 
 
 #[ ctrl_plane_backend bg;
+#[ extern int main_socket;
 
 #{ #ifdef T4P4S_P4RT
 #[     void init_control_plane()
@@ -361,8 +386,8 @@ for table, smem in hlir.all_counters:
 #{         #ifdef T4P4S_DEBUG
 #{         for (int i = 0; i < NB_TABLES; i++) {
 #[             lookup_table_t t = table_config[i];
-#[             if (state[0].tables[t.id][0]->init_entry_count > 0)
-#[                 debug("    " T4LIT(:,incoming) " Table " T4LIT(%s,table) " got " T4LIT(%d) " entries from the control plane\n", state[0].tables[t.id][0]->short_name, state[0].tables[t.id][0]->init_entry_count);
+#[             if (state[main_socket].tables[t.id][0]->init_entry_count > 0)
+#[                 debug("    " T4LIT(:,incoming) " Table " T4LIT(%s,table) " got " T4LIT(%d) " entries from the control plane\n", state[main_socket].tables[t.id][0]->short_name, state[main_socket].tables[t.id][0]->init_entry_count);
 #}             }
 #}         #endif
 #}     }

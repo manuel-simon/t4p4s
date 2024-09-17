@@ -174,7 +174,7 @@ bool init_tx_on_lcore(unsigned lcore_id, uint8_t portid, uint16_t queueid)
 
     uint8_t socketid = get_socketid(lcore_id);
 
-    debug("txq=%u,%d,%d\n", lcore_id, queueid, socketid);
+    debug("txq=(core)%u,(queue)%d,(socket)%d\n", lcore_id, queueid, socketid);
     fflush(stdout);
 
     struct rte_eth_dev_info dev_info;

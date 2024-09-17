@@ -73,7 +73,7 @@ void lpm_add(lookup_table_t* t, uint8_t* key, uint8_t depth, uint8_t* value)
     if (t->entry.key_size == 0) return; // don't add entries to keyless tables
 
     extended_table_t* ext = (extended_table_t*)t->table;
-    ext->content[ext->size] = make_table_entry_on_socket(t, value);
+    ext->content.pointer[ext->size] = make_table_entry_on_socket(t, value);
     if (t->entry.key_size <= 4) {
         // the rest is zeroed in case of keys smaller than 4 bytes
         uint32_t key32 = 0;
@@ -107,7 +107,7 @@ uint8_t* lpm_lookup(lookup_table_t* t, uint8_t* key)
 #else
         int ret = rte_lpm_lookup(ext->rte_table, key32, &result);
 #endif
-        return ret == 0 ? ext->content[result] : t->default_val;
+        return ret == 0 ? ext->content.pointer[result] : t->default_val;
     } else if (t->entry.key_size <= LPM6_BYTE_SIZE_LIMIT) {
         static uint8_t key128[LPM6_BYTE_SIZE_LIMIT];
         memset(key128, 0, LPM6_BYTE_SIZE_LIMIT);
@@ -115,7 +115,7 @@ uint8_t* lpm_lookup(lookup_table_t* t, uint8_t* key)
 
         table_index_t result;
         int ret = rte_lpm6_lookup(ext->rte_table, key128, &result);
-        return ret == 0 ? ext->content[result] : t->default_val;
+        return ret == 0 ? ext->content.pointer[result] : t->default_val;
     }
     return NULL;
 }
@@ -124,7 +124,7 @@ uint8_t* lpm_lookup(lookup_table_t* t, uint8_t* key)
 void lpm_flush(lookup_table_t* t)
 {
     extended_table_t* ext = (extended_table_t*)t->table;
-    rte_free(ext->content[ext->size]);
+    rte_free(ext->content.pointer[ext->size]);
     if (t->entry.key_size <= 4) {
         rte_lpm_delete_all(ext->rte_table);
     } else if (t->entry.key_size <= LPM6_BYTE_SIZE_LIMIT) {

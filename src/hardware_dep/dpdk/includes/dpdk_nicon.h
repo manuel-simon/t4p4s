@@ -31,7 +31,6 @@
 // note: this much space MUST be able to hold all deparsed content
 #define DEPARSE_BUFFER_SIZE     1024
 
-
 struct lcore_data {
     const uint64_t      drain_tsc;
     uint64_t            prev_tsc;
@@ -39,6 +38,7 @@ struct lcore_data {
     struct lcore_conf*  conf;
 
     packet*             pkts_burst[MAX_PKT_BURST];
+
     unsigned            nb_rx;
 
     bool                is_valid;

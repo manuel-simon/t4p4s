@@ -11,6 +11,24 @@
 volatile int packet_counter = 0;
 volatile int packet_with_error_counter = 0;
 
+#ifdef T4P4S_DEBUG
+#include <signal.h>
+#define BREAKPOINT raise(SIGINT);
+#else
+#define BREAKPOINT ;
+#endif
+
+#define BOOL_TO_STRING(x) x ? "true" : "false"
+
+#if RTE_VERSION >= RTE_VERSION_NUM(20,11,0,0)
+	#define MAIN_CORE rte_get_main_lcore()
+#else
+	#define MAIN_CORE rte_get_master_lcore()
+#endif
+
+extern uint64_t hz_millis;
+extern uint32_t nb_lcore_params;
+extern struct lcore_params lcore_params[];
 
 void get_broadcast_port_msg(char result[256], int ingress_port) {
     uint8_t nb_ports = get_port_count();
@@ -206,18 +224,15 @@ void init_stats(LCPARAMS)
     COUNTER_INIT(lcdata->conf->fwd_packet);
 }
 
-void dpdk_main_loop()
+bool dpdk_main_loop_rx()
 {
-    extern struct lcore_conf lcore_conf[RTE_MAX_LCORE];
-    uint32_t lcore_id = rte_lcore_id();
-
-    struct lcore_data lcdata_content = init_lcore_data();
+    struct lcore_data lcdata_content = init_lcore_data(true, false);
     packet_descriptor_t pd_content;
 
     struct lcore_data* lcdata = &lcdata_content;
     packet_descriptor_t* pd = &pd_content;
 
-    if (!initial_check(LCPARAMS_IN))   return;
+    if (!initial_check(LCPARAMS_IN))   return false;
 
     init_dataplane(pd, lcdata->conf->state.tables);
 
@@ -242,32 +257,43 @@ void dpdk_main_loop()
     }
 }
 
-
 static int
-launch_one_lcore(__attribute__((unused)) void *dummy)
+launch_one_lcore_rx()
 {
-    dpdk_main_loop();
+    dpdk_main_loop_rx();
     return 0;
+}
+
+static int remote_launch_lcore(uint32_t lcore_id)
+{
+        return rte_eal_remote_launch(launch_one_lcore_rx, NULL, lcore_id);
 }
 
 int launch_dpdk()
 {
+    unsigned lcore_id;
+
+    for (unsigned nb_lcore = 0; nb_lcore < nb_lcore_params; nb_lcore++) {
+	unsigned lcore_id = lcore_params[nb_lcore].lcore_id;
+	if (lcore_id == MAIN_CORE) {
+	} else {
+		remote_launch_lcore(lcore_id);
+	}
+	RTE_LOG(INFO, P4_FWD, "%d %d\n", nb_lcore, nb_lcore_params);
+    }
+    
+    launch_one_lcore_rx();
+
     #if RTE_VERSION >= RTE_VERSION_NUM(20,11,0,0)
-        rte_eal_mp_remote_launch(launch_one_lcore, NULL, CALL_MAIN);
-
-        unsigned lcore_id;
         RTE_LCORE_FOREACH_WORKER(lcore_id) {
-            if (rte_eal_wait_lcore(lcore_id) < 0)
-                return -1;
-        }
+        if (rte_eal_wait_lcore(lcore_id) < 0)
+            return -1;
+    	}
     #else
-        rte_eal_mp_remote_launch(launch_one_lcore, NULL, CALL_MASTER);
-
-        unsigned lcore_id;
-        RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-            if (rte_eal_wait_lcore(lcore_id) < 0)
-                return -1;
-        }
+	RTE_LCORE_FOREACH_SLAVE(lcore_id) {
+        if (rte_eal_wait_lcore(lcore_id) < 0)
+            return -1;
+	}
     #endif
 
     return 0;
@@ -315,7 +341,6 @@ int main(int argc, char** argv)
         init_table_default_actions();
 
         t4p4s_pre_launch(idx);
-
         int retval = launch_dpdk();
         if (retval < 0) {
             t4p4s_abnormal_exit(retval, idx);

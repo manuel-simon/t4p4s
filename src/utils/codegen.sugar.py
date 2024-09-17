@@ -213,7 +213,7 @@ def gen_format_statement_fieldref_wide(dst, src, dst_width, dst_is_vw, dst_bytew
                 dst_bytewidth = f'({src_vw_bitwidth}/8)'
     elif src.node_type == 'PathExpression':
         name = src.path.name
-        src_pointer = f'local_vars->{name}' if is_control_local_var(name) else f'parameters.{name}'
+        src_pointer = f'local_vars->{name}' if is_control_local_var(name) else f'parameters->{name}'
     elif src.node_type == 'Constant':
         src_pointer = generate_var_name('tmp_fldref_const')
         #[ uint8_t $src_pointer[$dst_bytewidth] = ${int_to_big_endian_byte_array_with_length(src.value, dst_bytewidth, src.base)};
@@ -260,7 +260,7 @@ def gen_format_statement_fieldref_short(dst, src, dst_width, dst_is_vw, dst_byte
     if src.node_type == 'PathExpression':
         indirection = "&" if is_primitive(src.type) else ""
         var_name = src.path.name
-        refbase = "local_vars->" if is_control_local_var(src.decl_ref.name) else 'parameters.'
+        refbase = "local_vars->" if is_control_local_var(src.decl_ref.name) else 'parameters->'
 
         #[ uint${bitlen}_t ${varname};
         if refbase == "local_vars->":
@@ -1027,7 +1027,7 @@ def gen_format_method_parameter(par, listexpr_to_buf):
         fmt = format_expr(par)
         if fmt == '':
             return None
-        ref = "&" if is_ref(par.expression) else ""
+        ref = "&" if is_ref(par.expression) and "&" not in fmt else ""
         #[ $ref$fmt
 
 # TODO not needed anymore, remove
@@ -1081,7 +1081,7 @@ def gen_pre_format_call_extern_make_buf_data(component, vardata, varoffset):
     elif component.node_type == 'PathExpression':
         name = component.path.name
         is_local = is_control_local_var(name)
-        param = f'local_vars->{name}' if is_local else f'parameters.{name}'
+        param = f'local_vars->{name}' if is_local else f'parameters->{name}'
         #pre[     memcpy($vardata + $varoffset, &($param), (${component.urtype.size}+7)/8);
         #pre[     $varoffset += (${component.urtype.size}+7)/8;
     elif component.node_type == 'Cast':
@@ -1144,6 +1144,9 @@ def gen_format_call_extern(args, mname, m, funname_override=None):
 
     with SugarStyle("inline_comment"):
         fmt_args += [fmt_arg for arg in args if not arg.is_vec() for fmt_arg in [gen_format_method_parameter(arg, listexpr_to_buf)] if fmt_arg is not None]
+
+    if m.path.name == 'add_entry':
+        fmt_args += ['parameters->table']
 
     #[     $mname(${gen_list_elems(fmt_args, "SHORT_STDPARAMS_IN")})
 
@@ -1447,7 +1450,7 @@ def gen_format_expr(e, format_as_value=True, expand_parameters=False, needs_vari
         elif is_local:
             #[ local_vars->$name
         elif is_abs:
-            #[ parameters.$name
+            #[ parameters->$name
         else:
             pass
     elif nt == 'Argument':

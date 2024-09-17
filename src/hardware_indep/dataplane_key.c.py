@@ -76,7 +76,7 @@ for table in hlir.tables:
             #[     key += ${byte_width};
         #[
 
-    if table.matchType.name == "lpm":
+    if table.match_type_code == "lpm":
         #[     key -= ${table.key_length_bytes};
     #} }
     #[

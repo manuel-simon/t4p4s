@@ -48,7 +48,7 @@ else:
         name = act.annotations.annotations.get('name')
         if name:
             #[     // action name: ${name.expr[0].value}
-        #{     void action_code_${act.name}(action_${act.name}_params_t parameters, SHORT_STDPARAMS) {
+        #{     void action_code_${act.name}(action_${act.name}_params_t *parameters, SHORT_STDPARAMS) {
         if len(act.body.components) != 0:
             #[         uint32_t value32, res32;
             #[         (void)value32, (void)res32;

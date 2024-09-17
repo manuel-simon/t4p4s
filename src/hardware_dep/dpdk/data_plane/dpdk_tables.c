@@ -24,7 +24,6 @@
 #include <rte_malloc.h>     // extended tables
 #include <rte_errno.h>
 
-
 // ============================================================================
 // Error messages
 
@@ -64,8 +63,16 @@ void rte_exit_with_errno(const char* msg, const char* table_name)
 // Sets up the fields of a table entry.
 void make_table_entry(uint8_t* entry, uint8_t* value, lookup_table_t* t) {
     memcpy(entry, value, t->entry.action_size);
-    memset(entry + t->entry.action_size, 0, t->entry.state_size);
     *entry_validity_ptr(entry, t) = VALID_TABLE_ENTRY;
+
+    if (t->access_locked) {
+        rte_spinlock_init(entry_lock_ptr(entry, t));
+    }
+}
+
+// Changes the value of a table entry
+void change_table_entry(uint8_t* entry, uint8_t* value, lookup_table_t* t) {
+    memcpy(entry, value, t->entry.action_size);
 }
 
 uint8_t* make_table_entry_on_socket(lookup_table_t* t, uint8_t* value) {
@@ -93,12 +100,19 @@ void create_ext_table(lookup_table_t* t, void* rte_table, int socketid);
 void create_ext_table(lookup_table_t* t, void* rte_table, int socketid)
 {
     extended_table_t* ext = rte_malloc_socket("extended_table_t", sizeof(extended_table_t), 0, socketid);
+    // exact stores pointer directly in table, or stores index to array with table entries; ternary does not use extra array
+    if (t->type == LOOKUP_exact_inplace) {
+        ext->content.inplace = rte_malloc_socket("table_entry", t->entry.entry_size * t->max_size, 0, socketid);
+    }
+    if (t->type == LOOKUP_lpm) {
+        ext->content.pointer = rte_malloc_socket("uint8_t*", sizeof(uint8_t * ) * t->max_size, 0, socketid);
+        if (unlikely(ext->content.pointer == NULL)) {
+            rte_exit_with_errno(t->type == 0 ? "create hash table" : t->type == 1 ? "create lpm table" : "cretate ternary table", t->canonical_name);
+        }
+    }
+
     ext->rte_table = rte_table;
     ext->size = 0;
-    ext->content = rte_malloc_socket("uint8_t*", sizeof(uint8_t*)*t->max_size, 0, socketid);
-    if (unlikely(ext->content == NULL)) {
-        rte_exit_with_errno(t->type == 0 ? "create hash table" : t->type == 1 ? "create lpm table" : "cretate ternary table", t->canonical_name);
-    }
     t->table = ext;
 }
 
@@ -111,6 +125,7 @@ void create_table(lookup_table_t* t, int socketid)
     switch(t->type)
     {
         case LOOKUP_exact:
+        case LOOKUP_exact_inplace:
             exact_create(t, socketid);
             break;
         case LOOKUP_lpm:

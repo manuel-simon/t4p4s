@@ -20,7 +20,6 @@ from compiler_common import unique_everseen
 
 #[ #define FIELD(name, length) uint8_t name[(length + 7) / 8];
 
-
 #{ typedef enum {
 for table in hlir.tables:
     for action in unique_everseen(table.actions):
@@ -37,6 +36,9 @@ for ctl in hlir.controls:
         for param in act.parameters.parameters:
             paramtype = param.urtype
             #[     ${format_type(param.urtype, varname = param.name)};
+
+        if act.is_default_action:
+            #[     table_name_t table;
 
         if len(act.parameters.parameters) == 0:
             #[     FIELD(DUMMY_FIELD, 0);
@@ -62,7 +64,7 @@ for table in hlir.tables:
         aname = action.action_object.name
         mname = action.expression.method.path.name
 
-        #[ void action_code_$aname(action_${mname}_params_t, SHORT_STDPARAMS);
+        #[ void action_code_$aname(action_${mname}_params_t*, SHORT_STDPARAMS);
 
 non_ctr_locals = ('counter', 'direct_counter', 'meter')
 

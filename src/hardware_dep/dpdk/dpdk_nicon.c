@@ -24,7 +24,11 @@ extern struct rte_mempool* pktmbuf_pool[NB_SOCKETS];
 
 struct rte_mbuf* deparse_mbuf;
 
-// ------------------------------------------------------
+// -----i-------------------------------------------------
+
+#ifndef NO_DRAIN
+    #define NO_DRAIN 0
+#endif
 
 /* Send burst of packets on an output interface */
 static inline void send_burst(struct lcore_conf *conf, uint16_t n, uint8_t port)
@@ -42,9 +46,9 @@ static inline void send_burst(struct lcore_conf *conf, uint16_t n, uint8_t port)
 
 void tx_burst_queue_drain(LCPARAMS) {
     uint64_t cur_tsc = rte_rdtsc();
-
     uint64_t diff_tsc = cur_tsc - lcdata->prev_tsc;
-    if (unlikely(diff_tsc > lcdata->drain_tsc)) {
+
+    if (NO_DRAIN || unlikely(diff_tsc > lcdata->drain_tsc)) {
         for (unsigned portid = 0; portid < get_nb_ports(); portid++) {
             if (lcdata->conf->hw.tx_mbufs[portid].len == 0)
                 continue;
@@ -54,8 +58,9 @@ void tx_burst_queue_drain(LCPARAMS) {
                        (uint8_t) portid);
             lcdata->conf->hw.tx_mbufs[portid].len = 0;
         }
-
+#if NO_DRAIN==0
         lcdata->prev_tsc = cur_tsc;
+#endif
     }
 }
 
@@ -123,11 +128,19 @@ static void dpdk_send_packet(struct rte_mbuf *mbuf, uint8_t port, uint32_t lcore
     struct lcore_conf *conf = &lcore_conf[lcore_id];
     uint16_t queue_length = add_packet_to_queue(mbuf, port, lcore_id);
 
+    #if NO_DRAIN==0
     if (unlikely(queue_length == MAX_PKT_BURST)) {
+        #define BURST MAX_PKT_BURST		    
+    #else
+	#define BURST 1
+    #endif    
         debug("    :: BURST SENDING DPDK PACKETS - port:%d\n", port);
-        send_burst(conf, MAX_PKT_BURST, port);
+        send_burst(conf, BURST, port);
         queue_length = 0;
+
+    #if NO_DRAIN==0
     }
+    #endif
 
     conf->hw.tx_mbufs[port].len = queue_length;
 }
@@ -143,16 +156,18 @@ void send_single_packet(packet* pkt, int egress_port, int ingress_port, bool sen
 
 // ------------------------------------------------------
 
-void init_queues(struct lcore_data* lcdata) {
-    for (unsigned i = 0; i < lcdata->conf->hw.n_rx_queue; i++) {
-        unsigned portid = lcdata->conf->hw.rx_queue_list[i].port_id;
-        uint8_t queueid = lcdata->conf->hw.rx_queue_list[i].queue_id;
-        RTE_LOG(INFO, P4_FWD, " -- lcoreid=%u portid=%u rxqueueid=%hhu\n", rte_lcore_id(), portid, queueid);
+void init_queues(struct lcore_data* lcdata, const bool recv_pkts, const bool recv_evts) {
+    if (recv_pkts) {
+	    for (unsigned i = 0; i < lcdata->conf->hw.n_rx_queue; i++) {
+		    unsigned portid = lcdata->conf->hw.rx_queue_list[i].port_id;
+		    uint8_t queueid = lcdata->conf->hw.rx_queue_list[i].queue_id;
+		    RTE_LOG(INFO, P4_FWD, " -- lcoreid=%u portid=%u rxqueueid=%hhu\n", rte_lcore_id(), portid, queueid);
+	    }
     }
 }
 
 extern void init_async_data(struct lcore_data *data);
-struct lcore_data init_lcore_data() {
+struct lcore_data init_lcore_data(const bool recv_pkts, const bool recv_evts) {
     struct lcore_data lcdata = {
         .drain_tsc = (rte_get_tsc_hz() + US_PER_S - 1) / US_PER_S * BURST_TX_DRAIN_US,
         .prev_tsc  = 0,
@@ -166,10 +181,9 @@ struct lcore_data init_lcore_data() {
     #if ASYNC_MODE != ASYNC_MODE_OFF
         init_async_data(&lcdata);
     #endif
-    if (lcdata.is_valid) {
-        RTE_LOG(INFO, P4_FWD, "entering main loop on lcore %u\n", rte_lcore_id());
-
-        init_queues(&lcdata);
+    if (lcdata.is_valid || !recv_pkts) {
+	    RTE_LOG(INFO, P4_FWD, "entering main loop on lcore %u\n", rte_lcore_id());
+	    init_queues(&lcdata, recv_pkts, recv_evts);
     } else {
         RTE_LOG(INFO, P4_FWD, "lcore %u has nothing to do\n", rte_lcore_id());
     }

@@ -16,6 +16,19 @@ extern void notify_controller_initialized();
 
 controller c;
 
+void notify_controller_initialized()
+{
+        char buffer[sizeof(struct p4_header)];
+        struct p4_header* h;
+
+        h = create_p4_header(buffer, 0, sizeof(struct p4_header));
+        h->type = P4T_CTRL_INITIALIZED;
+
+        netconv_p4_header(h);
+
+        send_p4_msg(c, buffer, sizeof(struct p4_header));
+}
+
 void fill_macfwd_table(uint8_t mac[6])
 {
     char buffer[2048];
@@ -315,6 +328,9 @@ void init_complex() {
     if (read_config_from_file(fn)<0) {
          printf("File cannnot be opened...\n");
     }
+
+    printf("Sending our own notify...\n");
+    notify_controller_initialized();
 }
 
 

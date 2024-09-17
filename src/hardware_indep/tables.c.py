@@ -23,6 +23,10 @@ table_short_names_sorted = '", "'.join(sorted(f'T4LIT({table.short_name},table)'
 for table in hlir.tables:
     tmt = table.matchType.name
     ks  = table.key_length_bytes
+    ts = table.table_size if hasattr(table, 'size') else 512
+    lk = "true" if table.used_writable and table.synced else "false"
+    hr = "false" if table.impl == "dpdk" else "true"
+
     #[ {
     #[  .name           = "${table.name}",
     #[  .canonical_name = "${table.canonical_name}",
@@ -39,13 +43,20 @@ for table in hlir.tables:
 
     #[      .key_size = $ks,
 
-    #[      .entry_size = sizeof(${table.name}_action_t) + sizeof(entry_validity_t),
+    if table.used_writable and table.synced:
+        #[      .entry_size = RTE_ALIGN(sizeof(${table.name}_action_t) + sizeof(entry_validity_t) + sizeof(lock_t), 16),
+        #[      .lock_size = sizeof(lock_t),
+    else:
+        #[      .entry_size = sizeof(${table.name}_action_t) + sizeof(entry_validity_t),
+        #[      .lock_size = 0,
     #[      .action_size   = sizeof(${table.name}_action_t),
     #[      .validity_size = sizeof(entry_validity_t),
     #[  },
 
     #[  .min_size = 0,
-    #[  .max_size = 250000,
+    #[  .max_size = $ts,
+    #[  .access_locked = $lk,
+    #[  .has_replicas = $hr,
 
     #{  #ifdef T4P4S_DEBUG
     #[      .short_name= "${table.short_name}",
@@ -55,16 +66,31 @@ for table in hlir.tables:
 
 
 for table in hlir.tables:
+    def_action = table.default_action.expression.method.action_ref.name
     #{ void setdefault_${table.name}(actions_t action_id, bool show_info) {
     #{     table_entry_${table.name}_t default_action = {
-    #[          .action = { action_id },
+    #[          .action = { .action_id = action_id, .${def_action}_params = { .table = TABLE_${table.name} } },
     #[          .is_entry_valid = VALID_TABLE_ENTRY,
     #}     };
     #[     table_setdefault_promote(TABLE_${table.name}, (actions_t*)&default_action, show_info);
     #} }
 
+for table in hlir.tables:
+    if table.add_on_miss:
+        for act in table.actions:
+            name = act.action_object.name
+            ks  = table.key_length_bytes
 
-#[ #define SOCKET0 0
+            #{ void add_entry__${name}_params_t(char** name, action_${name}_params_t* params, table_name_t table, SHORT_STDPARAMS) {
+            #[     ${table.name}_action_t action;
+            #[     bool success = ${table.name}_setup_action_wo_params(&action, *name);
+            #[     uint8_t key[$ks];
+            #[     table_${table.name}_key(pd, (uint8_t*) key);
+
+            #[     exact_add_promote(table, (uint8_t*)&key,  (uint8_t*)&action, false, true);
+            #} }
+
+#[ extern int main_socket; 
 
 #[ extern struct socket_state state[NB_SOCKETS];
 #[
@@ -78,8 +104,8 @@ nopinfo = "" if len(nops) == 0 else f' ({len(nops)} " T4LIT(nop,action) " defaul
 for table in sorted(hlir.tables, key=lambda table: table.short_name):
     default_action = table.default_action.expression.method.action_ref
     show_info = 'false' if table in nops else 'true'
-    #[     int current_replica_${table.name} = state[SOCKET0].active_replica[TABLE_${table.name}];
-    #{     if (likely(state[SOCKET0].tables[TABLE_${table.name}][current_replica_${table.name}]->default_val == NULL)) {
+    #[     int current_replica_${table.name} = state[main_socket].active_replica[TABLE_${table.name}];
+    #{     if (likely(state[main_socket].tables[TABLE_${table.name}][current_replica_${table.name}]->default_val == NULL)) {
     #[         setdefault_${table.name}(action_${default_action.name}, ${show_info});
     #}     }
 #} }
@@ -140,7 +166,7 @@ for table in hlir.tables:
         #}         },
         #}     };
 
-        mt = table.matchType.name
+        mt = table.match_type_code
         if mt == 'exact':
             #[     ${mt}_add_promote(TABLE_${table.name}, ${key_var}, (uint8_t*)&${action_var}, true, false);
         elif mt == 'lpm':
@@ -211,6 +237,13 @@ for table in hlir.tables:
 #[     return action_canonical_names[get_entry_action_id(entry)];
 #[ }
 
+#[// Computes the location of the validity field of the entry.
 #[ bool* entry_validity_ptr(uint8_t* entry, lookup_table_t* t) {
-#[     return (bool*)(entry + t->entry.action_size + t->entry.state_size);
+#[     return (bool*)(entry + t->entry.action_size + t->entry.lock_size);
 #[ }
+
+#[ // Computes the location of the lock field of the entry.
+#[ lock_t* entry_lock_ptr(uint8_t* entry, lookup_table_t* t) {
+#[     return (lock_t*)(entry + t->entry.action_size);
+#[ }
+
