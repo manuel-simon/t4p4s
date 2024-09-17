@@ -1,3 +1,43 @@
+# Add-on-Miss Table Insertions
+
+We extended T4P4S (see below) to allow for add-on-miss table insertions. Please have a look at our paper "On-the-fly Table Insertions on Programmable Software Data Planes" for more details.
+
+### How-To
+Example:
+```
+    action forward(@__ref bit<32> count) {
+        standard_metadata.egress_port = 9w1;
+        hdr.custom.payload1 = count;
+        count = hdr.custom.payload2;
+    }
+    
+    action new() {
+        standard_metadata.egress_port = 9w1;
+		add_entry("ingress.forward", (forward_params_t) { count = hdr.custom.payload2 });
+        hdr.custom.payload1 = 32w1;
+    }
+
+    @tableconfig table table0 {
+        actions = {
+            forward;
+	    new;
+        }
+        key = {
+            hdr.custom.payload1: exact;
+        }
+
+        size = 2097152;
+        default_action = new();
+        add_on_miss = true;
+    }
+```
+
+#### Updatable table entries
+To get the code for [High-Performance Match-Action Table Updates from within Programmable Software Data Planes
+](https://dl.acm.org/doi/10.1145/3493425.3502759) for data plane table updates, have a look at the [paper](https://github.com/manuel-simon/t4p4s/tree/paper) branch.
+
+#### eBPF
+To get the code for [Honey for the Ice Bear - Dynamic eBPF in P4](https://dl.acm.org/doi/10.1145/3672197.3673436) for eBPF extended P4, have a look at the [ebpf](https://github.com/manuel-simon/t4p4s/tree/ebpf) branch.
 
 # T₄P₄S, a multitarget P4<sub>16</sub> compiler
 
