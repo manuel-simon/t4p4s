@@ -17,7 +17,7 @@ Example:
         hdr.custom.payload1 = 32w1;
     }
 
-    @tableconfig table table0 {
+    table table0 {
         actions = {
             forward;
 	    new;
