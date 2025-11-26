@@ -14,6 +14,8 @@ from compiler_common import types, generate_var_name, get_hdrfld_name, unique_ev
 #[ #include "dpdk_smem.h"
 #[
 
+#[ extern void check_hdr_valid(packet_descriptor_t* pd, field_instance_e fld, const char* unspec);
+
 table_names = (table.short_name + ("/keyless" if table.key_bit_size == 0 else "") + ("/hidden" if table.is_hidden else "") for table in hlir.tables)
 all_table_infos = sorted(zip(hlir.tables, table_names), key=lambda k: len(k[0].actions))
 for part_idx, (table, table_info) in enumerate(all_table_infos):
